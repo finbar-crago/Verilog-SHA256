@@ -1,8 +1,8 @@
-`define CLKFREQ   12000000
+`define FREQ   12000000
 
 module top(input CLK, RXD, output TXD, LED0, LED1, LED2, LED3, LED4);
 
-   reg  [0:511] data = 512'h8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92;
+   reg  [0:511] data = 512'h_1;
    wire [0:255] hash;
 
    sha256 _sha256(.clk(CLK), .reset(1'b1), .in(data), .out(hash));
@@ -14,52 +14,39 @@ module top(input CLK, RXD, output TXD, LED0, LED1, LED2, LED3, LED4);
 
    reg  [6:0] pos;
    wire [7:0] ascii [0:15];
-   wire [0:255] hash2 = 256'h_8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92;
 
-   wire [7:0] char = (pos < 64) ? ascii[hash2[(pos * 4) +: 4]] : (pos == 65) ? 8'ha : 8'hd;
+   wire [7:0] char = (pos < 64) ? ascii[hash[(pos * 4) +: 4]] : (pos == 65) ? 8'h0a : 8'h0d;
 
-   reg [23:0] sec_clk = 0;
-   always @(negedge reset or posedge CLK) begin
-      if(!reset)
+   reg [23:0] sec_clk;
+   always @(posedge CLK) begin
+      if(busy)
+	   send = 0;
+
+      if(!busy && !send && start)
 	begin
-	   pos   <= 0;
-	   send  <= 0;
-	   start <= 0;
-	   LED0  <= 1;
-
-	end else begin
-
-	   if(busy)
-	     send <= 0;
-
-	   if(start && !busy)
+	   if(pos < 66)
 	     begin
-		if(pos < 66)
-		  begin
-		     pos  = pos + 1;
-		     send = 1;
-		  end
-		else start <= 0;
+		pos = pos + 1;
+		send = 1;
 	     end
-
-	   if(sec_clk == `CLKFREQ)
-	     begin
-		if(!start)
-		  begin
-		     pos   = 0;
-		     send  = 1;
-		     start = 1;
-		  end
-	     end
-	   sec_clk <= sec_clk + 1;
+	   else start = 0;
 
 	end
+
+      if(!start && sec_clk == (`FREQ))
+	begin
+	   pos   = 0;
+	   send  = 1;
+	   start = 1;
+	end
+
+      sec_clk <= sec_clk + 1;
    end
 
-   uart_tx tx(.clk(CLK), .send(send), .data(char), .busy(busy), .tx(TXD));
+   uart_tx tx(.clk(CLK), .tx(TXD), .send(send), .data(char), .busy(busy));
 
 // assign LED0 = 1;
-   assign LED1 = 0;
+// assign LED1 = 0;
    assign LED2 = 0;
    assign LED3 = 0;
    assign LED4 = 0;

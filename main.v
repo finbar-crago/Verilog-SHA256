@@ -1,15 +1,85 @@
-module top(input CLK, output LED0, LED1, LED2, LED3, LED4);
+`define CLKFREQ   12000000
 
-   reg  [0:511] data = 512'h61626380;
+module top(input CLK, RXD, output TXD, LED0, LED1, LED2, LED3, LED4);
+
+   reg  [0:511] data = 512'h8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92;
    wire [0:255] hash;
 
    sha256 _sha256(.clk(CLK), .reset(1'b1), .in(data), .out(hash));
 
-   assign LED0 = 1;
-   assign LED1 = hash[0];
-   assign LED2 = hash[1];
-   assign LED3 = hash[2];
-   assign LED4 = hash[3];
+
+   wire reset = 1;
+   reg 	start, send;
+   wire busy;
+
+   reg  [6:0] pos;
+   wire [7:0] ascii [0:15];
+   wire [0:255] hash2 = 256'h_8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92;
+
+   wire [7:0] char = (pos < 64) ? ascii[hash2[(pos * 4) +: 4]] : (pos == 65) ? 8'ha : 8'hd;
+
+   reg [23:0] sec_clk = 0;
+   always @(negedge reset or posedge CLK) begin
+      if(!reset)
+	begin
+	   pos   <= 0;
+	   send  <= 0;
+	   start <= 0;
+	   LED0  <= 1;
+
+	end else begin
+
+	   if(busy)
+	     send <= 0;
+
+	   if(start && !busy)
+	     begin
+		if(pos < 66)
+		  begin
+		     pos  = pos + 1;
+		     send = 1;
+		  end
+		else start <= 0;
+	     end
+
+	   if(sec_clk == `CLKFREQ)
+	     begin
+		if(!start)
+		  begin
+		     pos   = 0;
+		     send  = 1;
+		     start = 1;
+		  end
+	     end
+	   sec_clk <= sec_clk + 1;
+
+	end
+   end
+
+   uart_tx tx(.clk(CLK), .send(send), .data(char), .busy(busy), .tx(TXD));
+
+// assign LED0 = 1;
+   assign LED1 = 0;
+   assign LED2 = 0;
+   assign LED3 = 0;
+   assign LED4 = 0;
+
+   assign ascii[ 0] = 8'h30;
+   assign ascii[ 1] = 8'h31;
+   assign ascii[ 2] = 8'h32;
+   assign ascii[ 3] = 8'h33;
+   assign ascii[ 4] = 8'h34;
+   assign ascii[ 5] = 8'h35;
+   assign ascii[ 6] = 8'h36;
+   assign ascii[ 7] = 8'h37;
+   assign ascii[ 8] = 8'h38;
+   assign ascii[ 9] = 8'h39;
+   assign ascii[10] = 8'h61;
+   assign ascii[11] = 8'h62;
+   assign ascii[12] = 8'h63;
+   assign ascii[13] = 8'h64;
+   assign ascii[14] = 8'h65;
+   assign ascii[15] = 8'h66;
 endmodule
 
 

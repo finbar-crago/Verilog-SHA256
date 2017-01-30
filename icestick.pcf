@@ -1,0 +1,26 @@
+#set_io TXD 8
+#set_io RXD 9
+
+set_io CLK  21
+
+set_io LED0 95
+set_io LED1 96
+set_io LED2 97
+set_io LED3 98
+set_io LED4 99
+
+#
+# "PMOD" Socket
+# 
+# PIN 5,11 => Ground
+# PIN 6,12 => 3.3v
+
+#set_io PIN1  78
+#set_io PIN2  79 
+#set_io PIN3  80
+#set_io PIN4  81
+
+#set_io PIN7  87
+#set_io PIN8  88
+#set_io PIN9  90
+#set_io PIN10 91

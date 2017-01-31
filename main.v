@@ -3,11 +3,10 @@
 module top(input CLK, RXD, output TXD, LED0, LED1, LED2, LED3, LED4);
 
    wire [0:255] hash;
-   reg  [0:23]  data = {8'b01100001, 8'b01100010, 8'b01100011};
-   wire [0:511] msg = {data, 1'b1, 423'b0, 64'd24};
+   reg  [0:23] 	data = {8'b01100001, 8'b01100010, 8'b01100011};
+   wire [0:511] msg  = {data, 1'b1, 423'b0, 64'd24};
 
    sha256 _sha256(.clk(CLK), .reset(1'b1), .M(msg), .hash(hash));
-
 
    wire reset = 1;
    reg 	start, send;
@@ -81,7 +80,6 @@ module top(input CLK, RXD, output TXD, LED0, LED1, LED2, LED3, LED4);
    assign ascii[15] = 8'h66;
 endmodule
 
-
 `define a r[i-1][0]
 `define b r[i-1][1]
 `define c r[i-1][2]
@@ -91,7 +89,7 @@ endmodule
 `define g r[i-1][6]
 `define h r[i-1][7]
 
-`define ROTR(x,n) ((x >> n) | (x << 32 - n))
+`define ROTR(x,n) ((x >> n) | (x << (32 - n)))
 
 module sha256(input clk, reset, input wire [0:511] M, output wire [0:255] hash);
    genvar i;
@@ -99,9 +97,9 @@ module sha256(input clk, reset, input wire [0:511] M, output wire [0:255] hash);
    wire [0:31] h  [0:7];
    wire [0:31] k  [0:63];
    wire [0:31] w  [0:63];
-   wire [0:31] r  [0:63][0:7];
-   wire [0:31] t1 [0:63];
-   wire [0:31] t2 [0:63];
+   wire [0:31] r  [0:64][0:7];
+   wire [0:31] t1 [0:64];
+   wire [0:31] t2 [0:64];
 
    generate
       for(i = 0; i < 16; i = i+1)
@@ -114,9 +112,9 @@ module sha256(input clk, reset, input wire [0:511] M, output wire [0:255] hash);
       for(i = 0; i < 8; i = i+1)
 	assign r[0][i] = h[i];
 
-      for(i = 1; i < 64; i = i+1)
+      for(i = 1; i < 65; i = i+1)
 	begin
-	   assign t1[i] = `h + k[i] + w[i] + ((`e & `f) ^ ((~`e) & `g)) +
+	   assign t1[i] = `h + k[i-1] + w[i-1] + ((`e & `f) ^ ((~`e) & `g)) +
 			  (`ROTR(`e, 6) ^ `ROTR(`e, 11) ^ `ROTR(`e, 25));
 
 	   assign t2[i] = ((`a & `b) ^ (`a & `c) ^ (`b & `c)) +
@@ -133,10 +131,9 @@ module sha256(input clk, reset, input wire [0:511] M, output wire [0:255] hash);
 	end
 
       for(i = 0; i < 8; i = i+1)
-	assign hash[ (i*32) +: 32 ] = h[i] + r[63][i];
+	assign hash[ (i*32) +: 32 ] = h[i] + r[64][i];
 
    endgenerate
-
 
    assign h[0] = 32'h6a09e667;
    assign h[1] = 32'hbb67ae85;
@@ -146,7 +143,6 @@ module sha256(input clk, reset, input wire [0:511] M, output wire [0:255] hash);
    assign h[5] = 32'h9b05688c;
    assign h[6] = 32'h1f83d9ab;
    assign h[7] = 32'h5be0cd19;
-
 
    assign k[ 0] = 32'h428a2f98;
    assign k[ 1] = 32'h71374491;
@@ -212,5 +208,4 @@ module sha256(input clk, reset, input wire [0:511] M, output wire [0:255] hash);
    assign k[61] = 32'ha4506ceb;
    assign k[62] = 32'hbef9a3f7;
    assign k[63] = 32'hc67178f2;
-
 endmodule

@@ -1,12 +1,11 @@
-`define FREQ   12000000
+`define FREQ   (12000000 * 5)
 
 module top(input CLK, RXD, output TXD, LED0, LED1, LED2, LED3, LED4);
 
-   reg  [0:511] data = 512'h_1;
+   reg  [0:511] data = {8'b01100001, 8'b01100010, 8'b01100011, 1'b1, 423'b0, 64'b11000};
    wire [0:255] hash;
 
    sha256 _sha256(.clk(CLK), .reset(1'b1), .in(data), .out(hash));
-
 
    wire reset = 1;
    reg 	start, send;
@@ -17,36 +16,47 @@ module top(input CLK, RXD, output TXD, LED0, LED1, LED2, LED3, LED4);
 
    wire [7:0] char = (pos < 64) ? ascii[hash[(pos * 4) +: 4]] : (pos == 65) ? 8'h0a : 8'h0d;
 
-   reg [23:0] sec_clk;
-   always @(posedge CLK) begin
-      if(busy)
-	   send = 0;
-
-      if(!busy && !send && start)
-	begin
-	   if(pos < 66)
-	     begin
-		pos = pos + 1;
-		send = 1;
-	     end
-	   else start = 0;
-
-	end
-
-      if(!start && sec_clk == (`FREQ))
+   reg [31:0] sec_clk;
+   always @(negedge reset or posedge CLK) begin
+      if(!reset)
 	begin
 	   pos   = 0;
-	   send  = 1;
-	   start = 1;
+	   send  = 0;
+	   start = 0;
+	   LED0  = 1;
 	end
+      else begin
+	 if(busy)
+	   send = 0;
 
-      sec_clk <= sec_clk + 1;
+	 if(!busy && !send && start)
+	   begin
+	      if(pos < 66)
+		begin
+		   pos = pos + 1;
+		   send = 1;
+		end
+	      else start = 0;
+
+	   end
+
+	 if(!start && sec_clk == (`FREQ))
+	   begin
+	      pos   = 0;
+	      send  = 1;
+	      start = 1;
+
+	      sec_clk <= 0;
+	   end
+	 else
+	   sec_clk <= sec_clk + 1;
+
+      end
    end
 
    uart_tx tx(.clk(CLK), .tx(TXD), .send(send), .data(char), .busy(busy));
 
-// assign LED0 = 1;
-// assign LED1 = 0;
+   assign LED1 = 0;
    assign LED2 = 0;
    assign LED3 = 0;
    assign LED4 = 0;
@@ -70,6 +80,18 @@ module top(input CLK, RXD, output TXD, LED0, LED1, LED2, LED3, LED4);
 endmodule
 
 
+`define a r[i-1][0]
+`define b r[i-1][1]
+`define c r[i-1][2]
+`define d r[i-1][3]
+`define e r[i-1][4]
+`define f r[i-1][5]
+`define g r[i-1][6]
+`define h r[i-1][7]
+
+`define ROTR(x,n) ((x >> n) | (x << 32 - n))
+
+
 module sha256(input clk, reset, input wire [0:511] in, output wire [0:255] out);
    genvar i;
 
@@ -84,52 +106,38 @@ module sha256(input clk, reset, input wire [0:511] in, output wire [0:255] out);
 
       for(i = 16; i < 64; i = i+1)
 	assign w[i] =  w[i-16] + w[i-7] +
-		       (({w[i-15], w[i-15]} >> 7 ) ^
-			({w[i-15],w[i-15]} >> 18) ^
-			({w[i-15],w[i-15]} >> 3 )) +
-		       (({w[i-2],w[i-2]} >> 17) ^
-			({w[i-2],w[i-2]} >> 19) ^
-			({w[i-2],w[i-2]} >> 10));
+		       (`ROTR(w[i-15], 7) ^ `ROTR(w[i-15],18) ^ (w[i-15] >>  3)) +
+		       (`ROTR(w[i- 2],17) ^ `ROTR(w[i- 2],19) ^ (w[i- 2] >> 10));
 
       for(i = 0; i < 8; i = i+1)
 	assign r[0][i] = h[i];
 
       for(i = 1; i < 64; i = i+1)
 	begin
-	   /* a */ assign r[i][0] = r[i-1][7] + k[i] + w[i] +
-				    (({r[i-1][4],r[i-1][4]} >> 6) ^
-				     ({r[i-1][4],r[i-1][4]} >> 11)^
-				     ({r[i-1][4],r[i-1][4]} >> 25))+
-				    (r[i-1][4] & r[i-1][5]) ^ ((~r[i-1][4]) & r[i-1][6]) +
+	   assign r[i][0] /* a */ = `h + k[i] + w[i] +
+				    (`ROTR(`e, 6) ^ `ROTR(`e, 11) ^ `ROTR(`e, 25)) +
+				    (`e & `f) ^ ((~`e) & `g) +
+				    (`ROTR(`a, 2) ^ `ROTR(`a, 13) ^ `ROTR(`a, 22)) +
+				    (`a & `b) ^ (`a & `c) ^ (`b & `c);
 
-				    ({r[i-1][0],r[i-1][0]} >> 2) ^
-				    ({r[i-1][0],r[i-1][0]} >> 13)^
-				    ({r[i-1][0],r[i-1][0]} >> 22)+
+	   assign r[i][1] /* b */ = `a;
+	   assign r[i][2] /* c */ = `b;
+	   assign r[i][3] /* d */ = `c;
 
-				    (r[i-1][0] & r[i-1][1]) ^
-				    (r[i-1][0] & r[i-1][2]) ^
-				    (r[i-1][1] & r[i-1][2]);
+	   assign r[i][4] /* e */ = `h + k[i] + w[i] +
+				    (`ROTR(`e, 6) ^ `ROTR(`e, 11) ^ `ROTR(`e, 25)) +
+				    (`e & `f) ^ ((~`e) & `g);
 
-	   /* b */ assign r[i][1] = r[i-1][0];
-	   /* c */ assign r[i][2] = r[i-1][1];
-	   /* d */ assign r[i][3] = r[i-1][2];
-
-	   /* e */ assign r[i][4] = r[i-1][3] + r[i-1][7] + k[i] + w[i] + 
-				    (({r[i-1][4],r[i-1][4]} >> 6) ^
-				     ({r[i-1][4],r[i-1][4]} >> 11)^
-				     ({r[i-1][4],r[i-1][4]} >> 25))+
-				    (r[i-1][4] & r[i-1][5]) ^ ((~r[i-1][4]) & r[i-1][6]);
-
-	   /* f */ assign r[i][5] = r[i-1][4];
-	   /* g */ assign r[i][6] = r[i-1][5];
-	   /* h */ assign r[i][7] = r[i-1][6];
+	   assign r[i][5] /* f */ = `e;
+	   assign r[i][6] /* g */ = `f;
+	   assign r[i][7] /* h */ = `g;
 	end
 
       for(i = 0; i < 8; i = i+1)
 	assign out[ (i*32) +: 32 ] = h[i] + r[63][0];
 
    endgenerate
-  
+
 
    assign h[0] = 32'h6a09e667;
    assign h[1] = 32'hbb67ae85;

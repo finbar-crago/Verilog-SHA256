@@ -1,11 +1,13 @@
-`define FREQ   (12000000 * 5)
+`define FREQ (12000000 * 5)
 
 module top(input CLK, RXD, output TXD, LED0, LED1, LED2, LED3, LED4);
 
-   reg  [0:511] data = {8'b01100001, 8'b01100010, 8'b01100011, 1'b1, 423'b0, 64'b11000};
    wire [0:255] hash;
+   reg  [0:23]  data = {8'b01100001, 8'b01100010, 8'b01100011};
+   wire [0:511] msg = {data, 1'b1, 423'b0, 64'd24};
 
-   sha256 _sha256(.clk(CLK), .reset(1'b1), .in(data), .out(hash));
+   sha256 _sha256(.clk(CLK), .reset(1'b1), .M(msg), .hash(hash));
+
 
    wire reset = 1;
    reg 	start, send;

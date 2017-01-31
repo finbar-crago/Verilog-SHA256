@@ -209,3 +209,41 @@ module sha256(input clk, reset, input wire [0:511] M, output wire [0:255] hash);
    assign k[62] = 32'hbef9a3f7;
    assign k[63] = 32'hc67178f2;
 endmodule
+
+
+`define Cha(x,y,z) ((x & y) ^ ((~x) & z))
+`define Maj(x,y,z) ((x & y) ^ (x & z) ^ (y & z))
+
+`define S0(x) (`ROTR(x, 2) ^ `ROTR(x, 13) ^ `ROTR(x, 22))
+`define S1(x) (`ROTR(x, 6) ^ `ROTR(x, 11) ^ `ROTR(x, 25))
+
+module sha256_r4
+  (input  wire [0:31] a0, b0, c0, d0, e0, f0, g0, h0,
+   input  wire [0:31] k1, k2, k3, k4, w1, w2, w3, w4,
+   output wire [0:31] a4, b4, c4, d4, e4, f4, g4, h4);
+
+
+   wire [0:31] tmp1 = h0 + k1 + w1 + `Cha(e0, f0, g0) + `S1(e0);
+   wire [0:31] a1 = tmp1 + `Maj(a0, b0, c0) + `S0(a0);
+   wire [0:31] e1 = tmp1 + d0;
+
+   wire [0:31] tmp2 = g0 + k2 + w2 + `Cha(e1, e0, f0) + `S1(e1);
+   wire [0:31] a2 = tmp2 + `Maj(a1, a0, b0) + `S0(a1);
+   wire [0:31] e2 = tmp1 + c0;
+
+   wire [0:31] tmp3 = f0 + k3 + w3 + `Cha(e2, e1, e0) + `S1(e2);
+   wire [0:31] a3 = tmp3 + `Maj(a2, a1, a0) + `S0(a2);
+   wire [0:31] e3 = tmp3 + b0;
+
+   wire [0:31] tmp4 = e0 + k4 + w4 + `Cha(e3, e2, e1) + `S1(e3);
+
+   assign a4 = tmp4 + `Maj(a3, a2, a1) + `S0(a0);
+   assign b4 = a2;
+   assign c4 = a1;
+   assign d4 = a0;
+   assign e4 = tmp4 + a0;
+   assign f4 = e2;
+   assign g4 = e1;
+   assign h4 = e0;
+
+endmodule

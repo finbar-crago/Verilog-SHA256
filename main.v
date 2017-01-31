@@ -91,50 +91,47 @@ endmodule
 
 `define ROTR(x,n) ((x >> n) | (x << 32 - n))
 
-
-module sha256(input clk, reset, input wire [0:511] in, output wire [0:255] out);
+module sha256(input clk, reset, input wire [0:511] M, output wire [0:255] hash);
    genvar i;
 
-   wire [0:31] h [0:7];  
-   wire [0:31] k [0:63];  
-   wire [0:31] w [0:63];
-   wire [0:31] r [0:63][0:7];
+   wire [0:31] h  [0:7];
+   wire [0:31] k  [0:63];
+   wire [0:31] w  [0:63];
+   wire [0:31] r  [0:63][0:7];
+   wire [0:31] t1 [0:63];
+   wire [0:31] t2 [0:63];
 
    generate
       for(i = 0; i < 16; i = i+1)
-	assign w[i] = in[ (i*32) +: 32 ];
+	assign w[i] = M[ (i*32) +: 32 ];
 
       for(i = 16; i < 64; i = i+1)
-	assign w[i] =  w[i-16] + w[i-7] +
-		       (`ROTR(w[i-15], 7) ^ `ROTR(w[i-15],18) ^ (w[i-15] >>  3)) +
-		       (`ROTR(w[i- 2],17) ^ `ROTR(w[i- 2],19) ^ (w[i- 2] >> 10));
+	assign w[i] =  (`ROTR(w[i- 2],17) ^ `ROTR(w[i- 2],19) ^ (w[i- 2] >> 10)) + w[i-7] +
+		       (`ROTR(w[i-15], 7) ^ `ROTR(w[i-15],18) ^ (w[i-15] >>  3)) + w[i-16];
 
       for(i = 0; i < 8; i = i+1)
 	assign r[0][i] = h[i];
 
       for(i = 1; i < 64; i = i+1)
 	begin
-	   assign r[i][0] /* a */ = `h + k[i] + w[i] +
-				    (`ROTR(`e, 6) ^ `ROTR(`e, 11) ^ `ROTR(`e, 25)) +
-				    (`e & `f) ^ ((~`e) & `g) +
-				    (`ROTR(`a, 2) ^ `ROTR(`a, 13) ^ `ROTR(`a, 22)) +
-				    (`a & `b) ^ (`a & `c) ^ (`b & `c);
+	   assign t1[i] = `h + k[i] + w[i] + ((`e & `f) ^ ((~`e) & `g)) +
+			  (`ROTR(`e, 6) ^ `ROTR(`e, 11) ^ `ROTR(`e, 25));
 
+	   assign t2[i] = ((`a & `b) ^ (`a & `c) ^ (`b & `c)) +
+			  (`ROTR(`a, 2) ^ `ROTR(`a, 13) ^ `ROTR(`a, 22));
+
+	   assign r[i][0] /* a */ = t1[i] + t2[i];
 	   assign r[i][1] /* b */ = `a;
 	   assign r[i][2] /* c */ = `b;
 	   assign r[i][3] /* d */ = `c;
-
-	   assign r[i][4] /* e */ = `h + k[i] + w[i] +
-				    (`ROTR(`e, 6) ^ `ROTR(`e, 11) ^ `ROTR(`e, 25)) +
-				    (`e & `f) ^ ((~`e) & `g);
-
+	   assign r[i][4] /* e */ = `d + t1[i];
 	   assign r[i][5] /* f */ = `e;
 	   assign r[i][6] /* g */ = `f;
 	   assign r[i][7] /* h */ = `g;
 	end
 
       for(i = 0; i < 8; i = i+1)
-	assign out[ (i*32) +: 32 ] = h[i] + r[63][0];
+	assign hash[ (i*32) +: 32 ] = h[i] + r[63][i];
 
    endgenerate
 

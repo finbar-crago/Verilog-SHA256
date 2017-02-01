@@ -91,15 +91,21 @@ endmodule
 
 `define ROTR(x,n) ((x >> n) | (x << (32 - n)))
 
+`define Cha(x,y,z) ((x & y) ^ ((~x) & z))
+`define Maj(x,y,z) ((x & y) ^ (x & z) ^ (y & z))
+
+`define S0(x) (`ROTR(x, 2) ^ `ROTR(x, 13) ^ `ROTR(x, 22))
+`define S1(x) (`ROTR(x, 6) ^ `ROTR(x, 11) ^ `ROTR(x, 25))
+
 module sha256(input clk, reset, input wire [0:511] M, output wire [0:255] hash);
    genvar i;
 
-   wire [0:31] h  [0:7];
-   wire [0:31] k  [0:63];
-   wire [0:31] w  [0:63];
-   wire [0:31] r  [0:64][0:7];
-   wire [0:31] t1 [0:64];
-   wire [0:31] t2 [0:64];
+   wire [0:31] h   [0:7];
+   wire [0:31] k   [0:63];
+   wire [0:31] w   [0:63];
+   wire [0:31] r   [0:64][0:7];
+   wire [0:31] tmp [0:64];
+
 
    generate
       for(i = 0; i < 16; i = i+1)
@@ -109,22 +115,20 @@ module sha256(input clk, reset, input wire [0:511] M, output wire [0:255] hash);
 	assign w[i] =  (`ROTR(w[i- 2],17) ^ `ROTR(w[i- 2],19) ^ (w[i- 2] >> 10)) + w[i-7] +
 		       (`ROTR(w[i-15], 7) ^ `ROTR(w[i-15],18) ^ (w[i-15] >>  3)) + w[i-16];
 
+
       for(i = 0; i < 8; i = i+1)
 	assign r[0][i] = h[i];
 
+
       for(i = 1; i < 65; i = i+1)
 	begin
-	   assign t1[i] = `h + k[i-1] + w[i-1] + ((`e & `f) ^ ((~`e) & `g)) +
-			  (`ROTR(`e, 6) ^ `ROTR(`e, 11) ^ `ROTR(`e, 25));
+	   assign tmp[i] = `h + k[i-1] + w[i-1] + `Cha(`e, `f, `g) + `S1(`e);
 
-	   assign t2[i] = ((`a & `b) ^ (`a & `c) ^ (`b & `c)) +
-			  (`ROTR(`a, 2) ^ `ROTR(`a, 13) ^ `ROTR(`a, 22));
-
-	   assign r[i][0] /* a */ = t1[i] + t2[i];
+	   assign r[i][0] /* a */ = tmp[i] + `Maj(`a, `b, `c) + `S0(`a);
 	   assign r[i][1] /* b */ = `a;
 	   assign r[i][2] /* c */ = `b;
 	   assign r[i][3] /* d */ = `c;
-	   assign r[i][4] /* e */ = `d + t1[i];
+	   assign r[i][4] /* e */ = `d + tmp[i];
 	   assign r[i][5] /* f */ = `e;
 	   assign r[i][6] /* g */ = `f;
 	   assign r[i][7] /* h */ = `g;
@@ -209,13 +213,6 @@ module sha256(input clk, reset, input wire [0:511] M, output wire [0:255] hash);
    assign k[62] = 32'hbef9a3f7;
    assign k[63] = 32'hc67178f2;
 endmodule
-
-
-`define Cha(x,y,z) ((x & y) ^ ((~x) & z))
-`define Maj(x,y,z) ((x & y) ^ (x & z) ^ (y & z))
-
-`define S0(x) (`ROTR(x, 2) ^ `ROTR(x, 13) ^ `ROTR(x, 22))
-`define S1(x) (`ROTR(x, 6) ^ `ROTR(x, 11) ^ `ROTR(x, 25))
 
 module sha256_r4
   (input  wire [0:31] a0, b0, c0, d0, e0, f0, g0, h0,

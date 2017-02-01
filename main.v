@@ -2,9 +2,10 @@
 
 module top(input CLK, RXD, output TXD, LED0, LED1, LED2, LED3, LED4);
 
-   wire [0:255] hash;
    reg  [0:23] 	data = {8'b01100001, 8'b01100010, 8'b01100011};
    wire [0:511] msg  = {data, 1'b1, 423'b0, 64'd24};
+
+   wire [0:255] hash;
 
    sha256 _sha256(.clk(CLK), .reset(1'b1), .M(msg), .hash(hash));
 
@@ -116,25 +117,28 @@ module sha256(input clk, reset, input wire [0:511] M, output wire [0:255] hash);
       for(i = 16; i < 64; i = i+1)
 	assign w[i] = `Si0(w[i-15]) + w[i-7] + `Si1(w[i- 2]) + w[i-16];
 
+      sha256_r4 r0(.a0(h[0]), .b0(h[1]), .c0(h[2]), .d0(h[3]),
+		   .e0(h[4]), .f0(h[5]), .g0(h[6]), .h0(h[7]),
+
+		   .k1(k[0]), .k2(k[1]), .k3(k[2]), .k4(k[3]),
+		   .w1(w[0]), .w2(w[1]), .w3(w[2]), .w4(w[3]),
+
+		   .a4(r[0][0]), .b4(r[0][1]), .c4(r[0][2]), .d4(r[0][3]),
+		   .e4(r[0][4]), .f4(r[0][5]), .g4(r[0][6]), .h4(r[0][7]));
+
+      for(i = 1; i < 16; i = i+1) begin : r4_loop
+	 sha256_r4 rI(.a0(r[i-1][0]), .b0(r[i-1][1]), .c0(r[i-1][2]), .d0(r[i-1][3]),
+		      .e0(r[i-1][4]), .f0(r[i-1][5]), .g0(r[i-1][6]), .h0(r[i-1][7]),
+
+		      .k1(k[(i*4)+0]), .k2(k[(i*4)+1]), .k3(k[(i*4)+2]), .k4(k[(i*4)+3]),
+		      .w1(w[(i*4)+0]), .w2(w[(i*4)+1]), .w3(w[(i*4)+2]), .w4(w[(i*4)+3]),
+
+		      .a4(r[i][0]), .b4(r[i][1]), .c4(r[i][2]), .d4(r[i][3]),
+		      .e4(r[i][4]), .f4(r[i][5]), .g4(r[i][6]), .h4(r[i][7]));
+      end
+
       for(i = 0; i < 8; i = i+1)
-	assign r[0][i] = h[i];
-
-      for(i = 1; i < 65; i = i+1)
-	begin
-	   assign tmp[i] = `h + k[i-1] + w[i-1] + `Cha(`e, `f, `g) + `S1(`e);
-
-	   assign r[i][0] /* a */ = tmp[i] + `Maj(`a, `b, `c) + `S0(`a);
-	   assign r[i][1] /* b */ = `a;
-	   assign r[i][2] /* c */ = `b;
-	   assign r[i][3] /* d */ = `c;
-	   assign r[i][4] /* e */ = `d + tmp[i];
-	   assign r[i][5] /* f */ = `e;
-	   assign r[i][6] /* g */ = `f;
-	   assign r[i][7] /* h */ = `g;
-	end
-
-      for(i = 0; i < 8; i = i+1)
-	assign hash[ (i*32) +: 32 ] = h[i] + r[64][i];
+	assign hash[ (i*32) +: 32 ] = h[i] + r[15][i];
 
    endgenerate
 
@@ -218,14 +222,13 @@ module sha256_r4
    input  wire [0:31] k1, k2, k3, k4, w1, w2, w3, w4,
    output wire [0:31] a4, b4, c4, d4, e4, f4, g4, h4);
 
-
    wire [0:31] tmp1 = h0 + k1 + w1 + `Cha(e0, f0, g0) + `S1(e0);
    wire [0:31] a1 = tmp1 + `Maj(a0, b0, c0) + `S0(a0);
    wire [0:31] e1 = tmp1 + d0;
 
    wire [0:31] tmp2 = g0 + k2 + w2 + `Cha(e1, e0, f0) + `S1(e1);
    wire [0:31] a2 = tmp2 + `Maj(a1, a0, b0) + `S0(a1);
-   wire [0:31] e2 = tmp1 + c0;
+   wire [0:31] e2 = tmp2 + c0;
 
    wire [0:31] tmp3 = f0 + k3 + w3 + `Cha(e2, e1, e0) + `S1(e2);
    wire [0:31] a3 = tmp3 + `Maj(a2, a1, a0) + `S0(a2);
@@ -233,13 +236,14 @@ module sha256_r4
 
    wire [0:31] tmp4 = e0 + k4 + w4 + `Cha(e3, e2, e1) + `S1(e3);
 
-   assign a4 = tmp4 + `Maj(a3, a2, a1) + `S0(a0);
-   assign b4 = a2;
-   assign c4 = a1;
-   assign d4 = a0;
-   assign e4 = tmp4 + a0;
-   assign f4 = e2;
-   assign g4 = e1;
-   assign h4 = e0;
+   assign a4 = tmp4 + `Maj(a3, a2, a1) + `S0(a3);
+   assign b4 = a3;
+   assign c4 = a2;
+   assign d4 = a1;
+
+   assign e4 = a0 + tmp4;
+   assign f4 = e3;
+   assign g4 = e2;
+   assign h4 = e1;
 
 endmodule
